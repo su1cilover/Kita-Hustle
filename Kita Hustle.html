@@ -1,0 +1,806 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kita Hustle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400..700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<style>
+/* Layout concept: a fixed field of coin-spheres behind four tall scenes (float, fall, jar, release), then the game as glass panels. */
+:root{
+  --bg:#F2F3FF; --ink:#0E1A3F; --muted:#4F5C86; --soft:#6C779C; --accent:#2B37C9;
+  --blue:#4A5CFF; --blue-deep:#1C27A8; --mint:#0E8A62; --coral:#D9391F; --sun:#FFC63A; --on-sun:#2A1F00;
+  --glass:rgba(255,255,255,.52); --glass-strong:rgba(255,255,255,.72); --edge:rgba(255,255,255,.85); --line:rgba(28,39,168,.16);
+  --night:#0A1030;
+  --paper:#FBFBF7; --paper-ink:#1A1D2B; --paper-line:#B9BCC8; --p-pos:#0E7A56; --p-neg:#C3301A;
+  --f-display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --f-body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'DM Mono',ui-monospace,Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--f-body);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p,ol,ul,dl{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(43,55,201,.2);border-radius:99px}
+
+/* fixed layers */
+#bg{position:fixed;inset:0;z-index:0;transition:background 1.2s cubic-bezier(.65,0,.35,1);
+  background:radial-gradient(circle at center,#fff 0%,#f0f1ff 35%,#c9cffd 100%)}
+#bg[data-s="1"]{background:radial-gradient(circle at center,#fff 0%,#effff8 38%,#b9f2d9 100%)}
+#bg[data-s="2"]{background:radial-gradient(circle at center,#fff 0%,#fff8e1 38%,#ffe29a 100%)}
+#stage{position:fixed;inset:0;z-index:1;pointer-events:none}
+#stage canvas{display:block;width:100%;height:100%}
+
+/* loader */
+#loader{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 42%,#fff 0%,#eef0ff 45%,#d9deff 100%);transition:opacity .55s cubic-bezier(.65,0,.35,1)}
+#loader.leave{opacity:0;pointer-events:none}
+.ld{display:flex;flex-direction:column;align-items:center;gap:26px}
+.ld>*{opacity:0;transform:translateY(18px);filter:blur(6px);animation:ldIn .9s var(--ease) forwards}
+.ld>*:nth-child(1){animation-delay:.1s}.ld>*:nth-child(2){animation-delay:.26s}.ld>*:nth-child(3){animation-delay:.42s}
+@keyframes ldIn{to{opacity:1;transform:none;filter:none}}
+.ld-s{font:400 10px/1 var(--f-mono);letter-spacing:.28em;text-transform:uppercase;color:#6b78b5}
+.ld-bar{width:clamp(180px,32vw,280px);height:2px;background:rgba(43,55,201,.14);border-radius:99px;overflow:hidden}
+.ld-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#7b8aff,#2b37c9);box-shadow:0 0 14px rgba(74,92,255,.55);transition:width .45s var(--ease)}
+.ld-n{font:700 11px/1 var(--f-mono);letter-spacing:.1em;color:var(--accent);font-variant-numeric:tabular-nums}
+
+/* header */
+.hdr{position:fixed;top:0;left:0;right:0;z-index:30;pointer-events:none;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;height:calc(80px + env(safe-area-inset-top,0px));
+  padding-top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  opacity:0;transform:translateY(-16px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+body.in .hdr{opacity:1;transform:none}
+.hdr>*{pointer-events:auto}
+.mark{font:800 1.25rem/1 var(--f-display);letter-spacing:.22em;color:#080d26;text-decoration:none}
+.nav{display:none;gap:44px}
+.nav a{font:500 14px/1 var(--f-body);color:var(--ink);text-decoration:none;transition:opacity .2s}
+.nav a:hover{opacity:.55}
+.pillbtn{display:inline-flex;align-items:center;gap:14px;border:1px solid var(--edge);border-top-color:rgba(255,255,255,.95);background:rgba(255,255,255,.35);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:999px;padding:6px 6px 6px 22px;font:600 14px/1 var(--f-body);color:var(--ink);text-decoration:none;
+  box-shadow:inset 0 1.5px 2px rgba(255,255,255,.7),0 8px 30px rgba(20,30,120,.06);transition:background .25s}
+.pillbtn:hover{background:rgba(255,255,255,.55)}
+.orb{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none;
+  background:radial-gradient(circle at 50% 30%,#7b8aff 0%,#2b37c9 55%,#070e4a 100%);transition:transform .25s var(--ease)}
+.pillbtn:hover .orb{transform:scale(1.08)}
+.orb svg{width:14px;height:14px}
+@media(min-width:768px){.hdr{height:calc(96px + env(safe-area-inset-top,0px));padding-left:max(48px,env(safe-area-inset-left,0px));padding-right:max(48px,env(safe-area-inset-right,0px))}.nav{display:flex}.mark{font-size:1.4rem}}
+
+/* sections */
+.sec{position:relative;z-index:2;min-height:100vh;min-height:100svh;pointer-events:none;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.pe{pointer-events:auto}
+@media(min-width:768px){.sec{padding-left:max(48px,env(safe-area-inset-left,0px));padding-right:max(48px,env(safe-area-inset-right,0px))}}
+.lab{font:400 11px/1.3 var(--f-mono);letter-spacing:.25em;text-transform:uppercase;color:var(--accent);opacity:.82}
+.h2{font:500 clamp(2.6rem,9vw,5rem)/.96 var(--f-display);letter-spacing:-.035em;color:#080d26;text-wrap:balance}
+.copy{font:500 1.05rem/1.55 var(--f-body);color:#3a4570;max-width:34rem}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(42px);filter:blur(8px);transition:opacity 1.5s var(--ease) var(--d,0s),transform 1.5s var(--ease) var(--d,0s),filter 1.5s var(--ease) var(--d,0s)}
+.rv.on{opacity:1;transform:none;filter:none}
+.hin{opacity:0;transform:translateY(22px);transition:opacity 1s var(--ease) var(--d,0s),transform 1s var(--ease) var(--d,0s)}
+body.in .hin{opacity:1;transform:none}
+
+/* 01 hero */
+.s1{display:flex;align-items:flex-end;padding-bottom:48px}
+.s1-row{width:100%;display:flex;flex-direction:column;gap:32px}
+.eyebrow{font:500 13px/1 var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-bottom:22px}
+.h1{font:500 clamp(2.6rem,10.4vw,5.6rem)/.95 var(--f-display);letter-spacing:-.045em;color:#080d26;text-wrap:balance;max-width:11ch}
+.s1-side{max-width:270px}
+.s1-side p.lead{font:500 15px/1.4 var(--f-body)}
+.credit{font:400 10px/1.5 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--soft);margin-top:20px}
+.cue{display:none;align-items:center;gap:8px;margin-top:16px;color:var(--soft);font:400 10px/1 var(--f-mono);letter-spacing:.2em;text-transform:uppercase;animation:pulse 2s ease-in-out infinite}
+.cue svg{width:14px;height:14px}
+@keyframes pulse{50%{opacity:.4}}
+@media(min-width:768px){.s1{padding-bottom:56px}.s1-row{flex-direction:row;align-items:flex-end;justify-content:space-between}.cue{display:flex}.h1{max-width:none;white-space:nowrap}}
+
+/* 02 */
+.s2{display:flex;align-items:center;padding-top:128px;padding-bottom:160px}
+.grid12{width:100%;display:grid;grid-template-columns:1fr;gap:40px;align-items:start;max-width:1240px;margin:0 auto}
+.stack{display:flex;flex-direction:column;gap:14px}
+.gc{border-radius:1.4rem;padding:1px;background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,.3) 50%,rgba(255,255,255,.12));
+  box-shadow:0 14px 40px -12px rgba(43,55,201,.2);transition:transform .35s var(--ease)}
+.gc:hover{transform:translateY(-2px)}
+.gc-in{position:relative;border-radius:1.35rem;background:rgba(255,255,255,.3);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:20px 24px;overflow:hidden}
+.gc-in::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent)}
+.gc-h{display:flex;align-items:center;gap:10px;font:400 10px/1 var(--f-mono);color:var(--soft);margin-bottom:12px}
+.gc-h b{font-weight:500;letter-spacing:.2em;text-transform:uppercase}
+.gc-h i{margin-left:auto;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7b8aff,#2b37c9);box-shadow:0 0 8px rgba(74,92,255,.6)}
+.gc-v{font:600 1.15rem/1.25 var(--f-display);letter-spacing:-.01em}
+.gc-d{font:400 13px/1.45 var(--f-body);color:var(--muted);margin-top:4px}
+@media(min-width:1024px){.grid12{grid-template-columns:repeat(12,1fr);gap:64px}.g7{grid-column:span 7}.g5{grid-column:span 5;padding-top:12px}}
+
+/* 03 */
+.s3{display:flex;flex-direction:column;justify-content:space-between;padding-top:144px;padding-bottom:144px}
+.s3-bot{align-self:flex-end;max-width:24rem}
+.chipnote{display:inline-flex;align-items:center;gap:8px;margin-top:28px;padding:10px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.4);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#3a4570;font:400 10px/1 var(--f-mono);letter-spacing:.2em;text-transform:uppercase}
+.chipnote svg{width:14px;height:14px}
+@media(min-width:768px){.s3-bot{text-align:right}.s3-bot .copy{margin-left:auto}}
+
+/* 04 */
+.s4{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-top:144px;padding-bottom:144px}
+.s4 .h2{font-size:clamp(2.8rem,10vw,5.5rem)}
+.s4 .copy{margin:32px auto 0}
+.cta{display:inline-flex;align-items:center;gap:14px;margin-top:36px;border:0;border-radius:999px;padding:8px 8px 8px 28px;background:var(--ink);color:#fff;font:600 16px/1 var(--f-body);text-decoration:none;box-shadow:0 18px 40px -14px rgba(14,26,63,.5);transition:transform .3s var(--ease)}
+.cta:hover{transform:translateY(-2px)}
+.cta .orb{width:40px;height:40px}
+
+/* game */
+.s5{padding-top:96px;padding-bottom:96px}
+.gwrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.gtop{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.gtop .h2{font-size:clamp(2.2rem,7vw,3.4rem)}
+.tabs{display:flex;background:rgba(255,255,255,.5);border:1px solid var(--edge);border-radius:999px;padding:4px;gap:2px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.tabs button{border:0;background:transparent;padding:9px 18px;border-radius:999px;font-weight:600;font-size:.9rem;color:var(--muted);transition:background .25s,color .25s}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.glass{background:var(--glass);border:1px solid var(--edge);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0;
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:inset 0 1.5px 2px rgba(255,255,255,.7),0 18px 50px -20px rgba(43,55,201,.25)}
+.glass h3{font:700 1.35rem/1.1 var(--f-display);letter-spacing:-.02em}
+.blurb{color:var(--muted);font-size:.95rem}
+.meta{font:400 .8rem/1.55 var(--f-mono);display:flex;flex-direction:column;gap:2px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.fine{font-size:.85rem;color:var(--muted)}
+.eb{font:500 .72rem/1.3 var(--f-mono);text-transform:uppercase;letter-spacing:.1em;color:var(--accent)}
+.hero2{display:flex;flex-direction:column;gap:12px}
+.hero2 h1{font:600 clamp(2rem,7vw,3.2rem)/1.02 var(--f-display);letter-spacing:-.035em;text-wrap:balance}
+.lede{font-size:1.05rem;color:var(--muted);max-width:52ch}
+.btn{border:1.5px solid var(--ink);background:rgba(255,255,255,.6);color:var(--ink);padding:13px 20px;border-radius:999px;font-weight:700;text-align:center;transition:transform .25s var(--ease),background .25s}
+.btn:hover:not([disabled]){transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(180deg,#6577ff,#2b37c9);color:#fff;border-color:transparent;box-shadow:0 10px 24px -10px rgba(43,55,201,.7)}
+.btn.sun{background:var(--sun);color:var(--on-sun);border-color:transparent}
+.btn.small{padding:9px 14px;font-size:.88rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.linkish{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.85rem}
+
+.hud{display:flex;align-items:center;gap:16px}
+.jar{width:56px;height:72px;flex:none}
+.jar-body{fill:none;stroke:var(--ink);stroke-width:2.5}.jar-fill{fill:var(--sun)}.jar-lid{fill:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,auto);gap:6px 22px;min-width:0}
+.stats dt{font:500 .68rem/1.2 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--soft)}
+.stats dd{margin:2px 0 0;font:700 1.35rem/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.stats small{font:400 .72rem var(--f-mono);color:var(--soft)}
+@media(max-width:460px){.stats{grid-template-columns:1fr 1fr}.stats div:last-child{grid-column:1/-1}}
+
+.forecast{display:flex;gap:12px;align-items:flex-start}
+.pill{flex:none;font:600 .72rem/1 var(--f-mono);text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;border-radius:999px;background:var(--ink);color:#fff}
+.pill.up{background:var(--mint)}.pill.down{background:var(--coral)}
+.forecast b{display:block;font:600 1.05rem var(--f-display)}
+.forecast .t{font-size:.9rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--edge);background:rgba(255,255,255,.55);padding:9px 15px;border-radius:999px;font-weight:600;font-size:.9rem;transition:background .2s}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.field label{font-weight:600}
+.field output{font:700 1.3rem/1 var(--f-display);font-variant-numeric:tabular-nums}
+input[type="range"]{width:100%;accent-color:var(--blue);height:28px;margin:0}
+.scale{display:flex;justify-content:space-between;font:400 .72rem var(--f-mono);color:var(--soft)}
+.preview{background:rgba(255,255,255,.55);border-radius:14px;padding:14px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:.92rem}
+.preview dt{color:var(--muted)}
+.preview dd{margin:0;font:500 .92rem var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+
+.receipt{background:var(--paper);color:var(--paper-ink);font:400 .88rem/1.7 var(--f-mono);padding:22px 20px 10px;max-width:420px;width:100%;margin:0 auto;box-shadow:0 14px 40px -16px rgba(14,26,63,.35)}
+.receipt h3{font:700 1rem var(--f-mono);letter-spacing:.06em;text-align:center;text-transform:uppercase}
+.receipt .sub{text-align:center;color:#5b6076;font-size:.78rem}
+.receipt hr{border:0;border-top:1.5px dashed var(--paper-line);margin:10px 0}
+.receipt .r{display:flex;justify-content:space-between;gap:12px}
+.receipt .r span:last-child{font-variant-numeric:tabular-nums;text-align:right}
+.receipt .total{font-weight:500;font-size:1rem}
+.receipt .pos{color:var(--p-pos)}.receipt .neg{color:var(--p-neg)}
+.big{font:800 clamp(2.6rem,12vw,4rem)/1 var(--f-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big.pos{color:var(--mint)}.big.neg{color:var(--coral)}
+.tip{font-size:1.05rem;max-width:52ch}
+.jarbtns{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.steps,.rules{padding-left:1.2rem;display:flex;flex-direction:column;gap:6px}
+.check{display:flex;gap:10px;align-items:center;font-weight:600;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:var(--blue)}
+dl.words{display:grid;grid-template-columns:auto 1fr;gap:8px 16px}
+dl.words dt{font:700 .95rem var(--f-display)}
+dl.words dd{margin:0;color:var(--muted);font-size:.92rem}
+.safe{border:2px solid var(--ink)}
+.gfoot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* footer */
+.ft{position:relative;z-index:2;background:var(--night);color:#fff;border-radius:2.5rem 2.5rem 0 0;overflow:hidden}
+.ft::before{content:"";position:absolute;top:-8rem;right:-8rem;width:28rem;height:28rem;border-radius:50%;background:radial-gradient(circle,rgba(74,92,255,.4),transparent 65%);filter:blur(30px)}
+.ft::after{content:"";position:absolute;bottom:-10rem;left:-10rem;width:32rem;height:32rem;border-radius:50%;background:radial-gradient(circle,rgba(255,198,58,.2),transparent 65%);filter:blur(30px)}
+.mq{position:relative;z-index:1;border-bottom:1px solid rgba(255,255,255,.1);padding:20px 0;overflow:hidden}
+.mq-t{display:inline-flex;white-space:nowrap;animation:mq 26s linear infinite;will-change:transform}
+.mq-g{display:inline-flex;align-items:center;font:500 clamp(28px,6vw,64px)/1.1 var(--f-display);letter-spacing:-.03em;color:rgba(255,255,255,.9)}
+.mq-g span{padding:0 32px;display:inline-flex;align-items:center;gap:32px}
+.mq-g span::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--sun);flex:none}
+@keyframes mq{to{transform:translateX(-50%)}}
+.fb{position:relative;z-index:1;padding:64px max(16px,env(safe-area-inset-left,0px)) 40px;max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1fr;gap:40px}
+.fb .lab{color:rgba(255,255,255,.45)}
+.fb h2{font:500 clamp(2.2rem,7vw,3.8rem)/.98 var(--f-display);letter-spacing:-.035em;margin-top:16px}
+.fb ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:12px;font-size:15px;color:rgba(255,255,255,.78)}
+.fb li{display:flex;gap:12px}.fb li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sun);margin-top:.6em;flex:none}
+.fl{font:400 11px/1.5 var(--f-mono);color:rgba(255,255,255,.45);padding-top:24px;border-top:1px solid rgba(255,255,255,.1);grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media(min-width:900px){.fb{grid-template-columns:5fr 6fr;gap:64px;padding-top:96px}.ft{border-radius:4rem 4rem 0 0}}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){.rv,.hin,.hdr{transition:none;transform:none;filter:none;opacity:1}.mq-t,.cue{animation:none}}
+</style>
+
+<div id="bg" data-s="0"></div>
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<div id="loader" role="status" aria-live="polite">
+  <div class="ld">
+    <div class="ld-s" id="ldS">Counting the coins</div>
+    <div class="ld-bar"><div class="ld-fill" id="ldF"></div></div>
+    <div class="ld-n" id="ldN">000%</div>
+  </div>
+</div>
+
+<header class="hdr">
+  <a class="mark" href="#top" data-go="0">KITA</a>
+  <nav class="nav" aria-label="Sections">
+    <a href="#how" data-go="1">How it works</a>
+    <a href="#jar" data-go="2">The jar</a>
+    <a href="#game" data-go="game">Play</a>
+    <a href="#game" data-go="book">Playbook</a>
+  </nav>
+  <a class="pillbtn" href="#game" data-go="game"><span>Play now</span><span class="orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span></a>
+</header>
+
+<section class="sec s1" id="top">
+  <div class="s1-row pe">
+    <div>
+      <p class="eyebrow hin" style="--d:.15s">[ Money game for teens ]</p>
+      <h1 class="h1 hin" style="--d:.28s">Small hustles. Real money sense.</h1>
+    </div>
+    <div class="s1-side hin" style="--d:.45s">
+      <p class="lead">Run a pretend side hustle, learn what profit really is, then try one for real.</p>
+      <p class="credit">kita (n., Filipino): what you earn<br>For ages 12 to 18</p>
+      <div class="cue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m7-7-7 7-7-7"/></svg>Scroll</div>
+    </div>
+  </div>
+</section>
+
+<section class="sec s2" id="how">
+  <div class="grid12">
+    <div class="g7 pe">
+      <p class="lab rv">[ 02 &mdash; Cost ]</p>
+      <h2 class="h2 rv" style="--d:.1s;margin-top:24px">Every sale has<br>a price tag.</h2>
+      <p class="copy rv" style="--d:.2s;margin-top:32px">Keep scrolling and the coins fall. Making things costs money, and money you spend does not bounce back unless you sell. Price, cost and demand pull on each other every week.</p>
+    </div>
+    <div class="g5 pe">
+      <div class="stack rv" style="--d:.25s">
+        <article class="gc"><div class="gc-in"><div class="gc-h"><span>01</span><b>Price</b><i></i></div><div class="gc-v">Too high, nobody buys. Too low, you lose.</div><p class="gc-d">Customers compare you with every other seller nearby.</p></div></article>
+        <article class="gc"><div class="gc-in"><div class="gc-h"><span>02</span><b>Cost</b><i></i></div><div class="gc-v">What it takes to make one</div><p class="gc-d">Unsold stock is money already spent.</p></div></article>
+        <article class="gc"><div class="gc-in"><div class="gc-h"><span>03</span><b>Demand</b><i></i></div><div class="gc-v">Rain, rivals, school fairs</div><p class="gc-d">Every week is a different crowd.</p></div></article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec s3" id="jar">
+  <div class="pe">
+    <p class="lab rv">[ 03 &mdash; Jar ]</p>
+    <h2 class="h2 rv" style="--d:.1s;margin-top:24px;max-width:14ch">Save a little. Fill the jar.</h2>
+  </div>
+  <div class="s3-bot pe">
+    <p class="copy rv" style="--d:.15s">Put part of every profit away and the pile turns into something. Reach &#8369;3,000 in the game, then do it once for real. Move your cursor through the jar and watch it scatter and settle.</p>
+    <span class="chipnote rv" style="--d:.28s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg>Swipe through it</span>
+  </div>
+</section>
+
+<section class="sec s4">
+  <div style="max-width:48rem" class="pe">
+    <p class="lab rv">[ 04 &mdash; Your turn ]</p>
+    <h2 class="h2 rv" style="--d:.12s;margin-top:28px">Now run<br>one yourself.</h2>
+    <p class="copy rv" style="--d:.24s">Pick a hustle, set a price, decide how much to make, then open for the week. You start with &#8369;500.</p>
+    <a class="cta rv" style="--d:.34s" href="#game" data-go="game"><span>Open the game</span><span class="orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m7-7-7 7-7-7"/></svg></span></a>
+  </div>
+</section>
+
+<section class="sec s5" id="game" style="pointer-events:auto">
+  <div class="gwrap">
+    <div class="gtop">
+      <div><p class="lab">[ 05 &mdash; Game ]</p><h2 class="h2" style="margin-top:14px">Your hustle</h2></div>
+      <div class="tabs" role="group" aria-label="Game sections">
+        <button type="button" data-act="tab" data-tab="play" aria-pressed="true">Play</button>
+        <button type="button" data-act="tab" data-tab="book" aria-pressed="false">Playbook</button>
+      </div>
+    </div>
+    <div id="play" class="gwrap" style="max-width:none"></div>
+    <div id="book" class="gwrap" style="max-width:none" hidden></div>
+    <div class="gfoot">
+      <p class="fine">Practice game. The numbers are made up and real results will differ.</p>
+      <span id="resetSlot"></span>
+    </div>
+  </div>
+</section>
+
+<footer class="ft">
+  <div class="mq" aria-hidden="true"><div class="mq-t">
+    <div class="mq-g"><span>Price it right</span><span>Know your cost</span><span>Fill the jar</span><span>Try it for real</span></div>
+    <div class="mq-g"><span>Price it right</span><span>Know your cost</span><span>Fill the jar</span><span>Try it for real</span></div>
+  </div></div>
+  <div class="fb">
+    <div><p class="lab">[ Before you sell anything ]</p><h2>Ask a grown-up<br>first.</h2></div>
+    <ul>
+      <li>Ask a parent or guardian before you sell for real.</li>
+      <li>Sell to people you know, or with an adult nearby.</li>
+      <li>Meet buyers in public places, never alone at home.</li>
+      <li>Never send money first to a stranger or share your address or ID online.</li>
+      <li>Payment apps usually need an adult account. Use a parent's.</li>
+    </ul>
+    <div class="fl"><span>KITA &middot; Money game for ages 12 to 18</span><span>Practice only. Not financial advice.</span></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+"use strict";
+var reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var control={progress:0,started:false};
+var mousePos={x:99,y:99,isDown:false};
+var $=function(id){return document.getElementById(id);};
+
+/* ---------- pointer ---------- */
+window.addEventListener("pointermove",function(e){mousePos.x=(e.clientX/window.innerWidth)*2-1;mousePos.y=-(e.clientY/window.innerHeight)*2+1;},{passive:true});
+window.addEventListener("pointerdown",function(){mousePos.isDown=true;});
+window.addEventListener("pointerup",function(){mousePos.isDown=false;});
+document.addEventListener("pointerleave",function(){mousePos.x=99;mousePos.y=99;});
+
+/* ---------- smooth scroll (lerp 0.09) ---------- */
+var sTarget=window.scrollY, sCur=window.scrollY, selfScroll=false, hasTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+function maxScroll(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
+function goTo(y){sTarget=Math.max(0,Math.min(maxScroll(),y));}
+if(!hasTouch&&!reduce){
+  window.addEventListener("wheel",function(e){
+    if(e.ctrlKey)return;
+    e.preventDefault();
+    var d=e.deltaMode===1?e.deltaY*32:e.deltaMode===2?e.deltaY*window.innerHeight:e.deltaY;
+    sTarget=Math.max(0,Math.min(maxScroll(),sTarget+d));
+  },{passive:false});
+}
+window.addEventListener("scroll",function(){
+  if(!selfScroll&&Math.abs(window.scrollY-sCur)>2){sCur=sTarget=window.scrollY;}
+  queueProgress();
+},{passive:true});
+function scrollTick(){
+  var diff=sTarget-sCur;
+  if(Math.abs(diff)>0.3){
+    sCur+=diff*(reduce?1:0.09);
+    selfScroll=true; window.scrollTo(0,sCur); selfScroll=false;
+  }
+  requestAnimationFrame(scrollTick);
+}
+requestAnimationFrame(scrollTick);
+
+/* ---------- scroll -> progress ---------- */
+var pq=false, bgEl=$("bg"), lastStage=-1;
+function queueProgress(){if(pq)return;pq=true;requestAnimationFrame(updateProgress);}
+function updateProgress(){
+  pq=false;
+  var vh=window.innerHeight||1;
+  var p=window.scrollY/vh; control.progress=p;
+  var st=p>1.55?2:p>0.7?1:0;
+  if(st!==lastStage){lastStage=st;bgEl.setAttribute("data-s",String(st));}
+}
+window.addEventListener("resize",queueProgress);
+updateProgress();
+
+/* ---------- reveal ---------- */
+var rvs=[].slice.call(document.querySelectorAll(".rv"));
+if("IntersectionObserver" in window&&!reduce){
+  var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add("on");io.unobserve(en.target);}});},{threshold:0.3,rootMargin:"0px 0px -6% 0px"});
+  rvs.forEach(function(el){io.observe(el);});
+}else{rvs.forEach(function(el){el.classList.add("on");});}
+
+/* ---------- nav ---------- */
+document.addEventListener("click",function(e){
+  var a=e.target.closest?e.target.closest("[data-go]"):null; if(!a)return;
+  e.preventDefault();
+  var g=a.getAttribute("data-go"), vh=window.innerHeight;
+  if(g==="game"||g==="book"){
+    if(g==="book")setTab("book"); else if(a.closest(".hdr")||a.classList.contains("cta"))setTab("play");
+    goTo($("game").offsetTop-0);
+  }else goTo(parseFloat(g)*vh);
+});
+
+/* ---------- loader ---------- */
+var ready=false, ldVal=0, ldDone=false, ldLast=performance.now();
+function ldTick(now){
+  var dt=Math.min(0.05,(now-ldLast)/1000); ldLast=now;
+  if(!ldDone){
+    if(!ready)ldVal+=(92-ldVal)*1.7*dt; else{ldVal+=(100-ldVal)*6*dt; if(ldVal>=99.4)ldVal=100;}
+    $("ldF").style.width=ldVal.toFixed(1)+"%";
+    $("ldN").textContent=String(Math.floor(ldVal)).padStart(3,"0")+"%";
+    $("ldS").textContent=ldVal>=100?"Opening the stall":"Counting the coins";
+    if(ldVal>=99.9&&ready){
+      ldDone=true;
+      setTimeout(function(){$("loader").classList.add("leave");},140);
+      setTimeout(function(){control.started=true;document.body.classList.add("in");},140+520);
+      setTimeout(function(){var l=$("loader");if(l&&l.parentNode)l.parentNode.removeChild(l);},1400);
+    }
+  }
+  if(!ldDone)requestAnimationFrame(ldTick);
+}
+requestAnimationFrame(ldTick);
+setTimeout(function(){ready=true;},7000); /* safety: never hang the loader */
+
+/* ---------- WebGL scene ---------- */
+function initScene(onReady){
+  if(typeof THREE==="undefined"){onReady();return;}
+  var container=$("stage"), canvas=$("cv"), renderer;
+  try{renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,alpha:true,powerPreference:"high-performance"});}
+  catch(err){onReady();return;}
+  var scene=new THREE.Scene();
+  var camera=new THREE.PerspectiveCamera(38,container.clientWidth/container.clientHeight,0.1,100);
+  camera.position.set(0,0,11);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(container.clientWidth,container.clientHeight);
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.05;
+
+  var palette=function(o){var r={};for(var k in o)r[k]=new THREE.Color(o[k]);return r;};
+  var palHero=palette({pastel:"#EEF0FF",light:"#B9C2FF",medium:"#6E7BFF",deep:"#3340D6",glass:"#8794FF"});
+  var palMint=palette({pastel:"#E9FFF6",light:"#A8F0D2",medium:"#3ED6A0",deep:"#0FA57A",glass:"#6FE3BA"});
+  var palSun =palette({pastel:"#FFF8DE",light:"#FFE79A",medium:"#FFC63A",deep:"#F29A00",glass:"#FFD35E"});
+  var ROLES=["pastel","light","medium","deep","glass"];
+  var curPal={};ROLES.forEach(function(r){curPal[r]=new THREE.Color();});
+
+  var hemi=new THREE.HemisphereLight(0xffffff,palHero.medium.clone(),1.15); scene.add(hemi);
+  var key=new THREE.DirectionalLight(0xffffff,1.0); key.position.set(-6,10,8); scene.add(key);
+  var rim=new THREE.DirectionalLight(0xffffff,0.9); rim.position.set(8,7,-8); scene.add(rim);
+  var front=new THREE.DirectionalLight(0xffffff,0.35); front.position.set(0,0,11); scene.add(front);
+  var side=new THREE.DirectionalLight(0xffffff,0.25); side.position.set(-9,-2,4); scene.add(side);
+
+  var vw=10,vh=6;
+  function frustum(){var f=THREE.MathUtils.degToRad(camera.fov);vh=2*Math.tan(f/2)*camera.position.z;vw=vh*(container.clientWidth/container.clientHeight);}
+  frustum();
+  var isMobile=window.innerWidth<768, ballCount=isMobile?54:96;
+
+  var geo=new THREE.SphereGeometry(1,48,48), balls=[], pal=palHero;
+  for(var i=0;i<ballCount;i++){
+    var radius, rr=Math.random();
+    if(rr<0.3)radius=0.27+Math.random()*0.12; else if(rr<0.8)radius=0.42+Math.random()*0.18; else radius=0.66+Math.random()*0.21;
+    var mass=Math.pow(radius,3), isGlass=Math.random()<0.22, role="medium", chosen=pal.medium, mat;
+    if(isGlass){
+      mat=new THREE.MeshPhysicalMaterial({color:pal.glass,roughness:0.08,metalness:0,clearcoat:1,clearcoatRoughness:0.03,transmission:0.95,ior:1.485,thickness:2.2,
+        specularColor:new THREE.Color("#ffffff"),specularIntensity:1,attenuationColor:pal.pastel,attenuationDistance:1,emissive:pal.glass,emissiveIntensity:0.12,transparent:true});
+      role="glass";chosen=pal.glass;
+    }else{
+      var cr=Math.random();
+      if(cr<0.25){chosen=pal.pastel;role="pastel";}else if(cr<0.55){chosen=pal.light;role="light";}else if(cr<0.85){chosen=pal.medium;role="medium";}else{chosen=pal.deep;role="deep";}
+      mat=new THREE.MeshPhysicalMaterial({color:chosen,roughness:0.44,metalness:0,clearcoat:0.24,clearcoatRoughness:0.35,emissive:chosen,emissiveIntensity:0.08,transparent:true});
+    }
+    var grp=new THREE.Group(), mesh=new THREE.Mesh(geo,mat); mesh.scale.setScalar(radius); grp.add(mesh); scene.add(grp);
+    balls.push({id:i,radius:radius,mass:mass,position:new THREE.Vector3(),velocity:new THREE.Vector3(),meshGroup:grp,sphere:mesh,material:mat,role:role,isGlass:isGlass,
+      visualScale:radius,shapeTarget:new THREE.Vector3()});
+  }
+  var meanR=balls.reduce(function(s,b){return s+b.radius;},0)/balls.length, shapeScale=1;
+
+  /* jar silhouette */
+  function inJar(x,y){
+    if(y>=-1.1&&y<=0.78){
+      if(Math.abs(x)>0.85)return false;
+      if(y<-0.75){var cx=Math.abs(x)-0.5,cy=-0.75-y; if(cx>0&&cy>0)return cx*cx+cy*cy<=0.35*0.35;}
+      return true;
+    }
+    if(y>0.78&&y<=1.08)return Math.abs(x)<=0.56;
+    return false;
+  }
+  function assignTargets(){
+    var S=Math.min(vw*0.3,vh*0.33), baseCY=-vh*0.02;
+    shapeScale=Math.max(0.3,Math.min(1,(S*0.36/2.0)/meanR));
+    balls.forEach(function(b){
+      var x=0,y=0,t=0;
+      do{x=(Math.random()*2-1)*0.85;y=Math.random()*2.18-1.1;t++;}while(!inJar(x,y)&&t<60);
+      b.shapeTarget.set(x*S*1.15,(y-0.02)*S*1.15+baseCY,(Math.random()-0.5)*0.35);
+    });
+  }
+  assignTargets();
+
+  function scatterFar(inward){
+    var R=Math.max(vw,vh)*1.5;
+    balls.forEach(function(b){
+      var a=Math.random()*Math.PI*2, px=Math.cos(a)*R*1.25, py=Math.sin(a)*R*0.85, pz=(Math.random()-0.5)*4;
+      b.position.set(px,py,pz); b.meshGroup.position.copy(b.position);
+      if(inward)b.velocity.set(-px,-py,-pz).normalize().multiplyScalar(0.08+Math.random()*0.05); else b.velocity.set(0,0,0);
+    });
+  }
+  scatterFar(false);
+
+  var P={rebound:-0.3,repelForce:0.05,repelRadius:4.4,center:0.0035,bounce:0.02};
+  var mProj=new THREE.Vector3(), mWorld=new THREE.Vector3(), prevM=new THREE.Vector3(), mSpeed=0;
+  function updMouse(){mProj.set(mousePos.x,mousePos.y,0.5);mProj.unproject(camera);var d=mProj.sub(camera.position).normalize();var dist=-camera.position.z/d.z;mWorld.copy(camera.position).add(d.multiplyScalar(dist));}
+  var clamp01=function(v){return v<0?0:v>1?1:v;};
+  var smooth=function(a,b,x){var t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
+  var lerp=function(a,b,t){return a+(b-a)*t;};
+  var easeOut=function(t){return 1-Math.pow(1-t,3);};
+
+  var clock=new THREE.Clock(), localStarted=false, entranceStart=0, reported=false, emptyDrawn=false;
+  var diff=new THREE.Vector3(), cd=new THREE.Vector3(), rel=new THREE.Vector3(), dp=new THREE.Vector3(), ax=new THREE.Vector3();
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var time=clock.getElapsedTime(); clock.getDelta();
+    updMouse();
+    if(control.started&&!localStarted){localStarted=true;entranceStart=time;scatterFar(true);}
+    if(!localStarted){renderer.render(scene,camera);if(!reported){reported=true;onReady();}return;}
+
+    var progress=control.progress;
+    if(progress>3.9&&emptyDrawn)return;
+
+    var heroF=1-smooth(0.30,0.80,progress), dropRaw=smooth(0.40,0.95,progress), flyF=smooth(2.7,3.45,progress);
+    var shapeF=smooth(1.40,2.05,progress)*(1-smooth(2.55,3.0,progress));
+    var dropF=dropRaw*(1-smooth(1.25,1.75,progress));
+    var bMint=smooth(0.55,1.05,progress), bSun=smooth(1.40,1.95,progress);
+    ROLES.forEach(function(r){curPal[r].copy(palHero[r]).lerp(palMint[r],bMint).lerp(palSun[r],bSun);});
+    hemi.groundColor.copy(curPal.medium);
+
+    var entranceT=easeOut(clamp01((time-entranceStart)/2.2)), boost=lerp(7.5,1,entranceT);
+    var interacting=Math.abs(mousePos.x)<0.99||Math.abs(mousePos.y)<0.99;
+    mSpeed=interacting?mWorld.distanceTo(prevM):0; if(mSpeed>3)mSpeed=3; prevM.copy(mWorld);
+
+    var damping=0.91; damping=lerp(damping,0.992,dropF); damping=lerp(damping,0.90,shapeF); damping=lerp(damping,0.985,flyF);
+    var camZ=camera.position.z, clusterActive=Math.max(heroF,entranceT<1?1:0), n=balls.length;
+
+    for(var i=0;i<n;i++){
+      var b=balls[i];
+      if(heroF>0.01){
+        b.velocity.x+=Math.sin(time*0.4+b.id*1.5)*0.0004*b.radius*heroF;
+        b.velocity.y+=Math.cos(time*0.5+b.id*1.2)*0.0004*b.radius*heroF;
+        b.velocity.z+=Math.sin(time*0.35+b.id)*0.0001*heroF;
+      }
+      var cs=P.center*boost*clusterActive;
+      if(cs>0.00001){b.velocity.x+=(0-b.position.x)*cs*0.38;b.velocity.y+=(0-b.position.y)*cs*1.85;b.velocity.z+=(0-b.position.z)*cs*1.8;}
+      if(dropF>0.001)b.velocity.y-=0.011*dropF;
+      if(shapeF>0.001){var k=0.06*shapeF;b.velocity.x+=(b.shapeTarget.x-b.position.x)*k;b.velocity.y+=(b.shapeTarget.y-b.position.y)*k;b.velocity.z+=(b.shapeTarget.z-b.position.z)*k;}
+      if(flyF>0.001){
+        var st=(b.id*0.6180339887)%1, loc=smooth(st*0.55,st*0.55+0.45,flyF);
+        b.velocity.z+=0.05*loc; b.velocity.x+=b.position.x*0.006*loc; b.velocity.y+=b.position.y*0.006*loc;
+      }
+      if(interacting){
+        diff.subVectors(b.position,mWorld);
+        var rd=diff.length(), down=mousePos.isDown, rad=down?P.repelRadius*1.4:P.repelRadius, frc=down?P.repelForce*1.7:P.repelForce;
+        if(rd<rad&&rd>0.0001){
+          var ratio=rd/rad, sf=1-(ratio*ratio*(3-2*ratio)), push=sf*frc*(1+mSpeed*3.2);
+          diff.normalize(); diff.z*=0.12; diff.normalize(); b.velocity.addScaledVector(diff,push);
+        }
+      }
+      b.velocity.multiplyScalar(damping); b.position.addScaledVector(b.velocity,1);
+      var c=b.isGlass?curPal.glass:curPal[b.role]; b.material.color.copy(c); b.material.emissive.copy(c);
+      b.material.opacity=flyF>0.001?1-smooth(camZ-2.6,camZ-0.3,b.position.z):1;
+      var tv=b.radius*(1-(1-shapeScale)*shapeF); b.visualScale+=(tv-b.visualScale)*0.12; b.sphere.scale.setScalar(b.visualScale);
+    }
+
+    var collideScale=0.28*(1-0.93*shapeF)*(1-flyF);
+    if(collideScale>0.002){
+      for(var s=0;s<4;s++){
+        for(var a=0;a<n;a++){
+          for(var c2=a+1;c2<n;c2++){
+            var b1=balls[a],b2=balls[c2];
+            cd.subVectors(b2.position,b1.position);
+            var dist=cd.length(), minD=b1.visualScale+b2.visualScale;
+            if(dist<minD&&dist>0.001){
+              var ov=minD-dist; cd.multiplyScalar(1/dist);
+              var tm=b1.mass+b2.mass, r1=b2.mass/tm, r2=b1.mass/tm;
+              b1.position.addScaledVector(cd,-ov*r1*collideScale); b2.position.addScaledVector(cd,ov*r2*collideScale);
+              rel.subVectors(b2.velocity,b1.velocity); var van=rel.dot(cd);
+              if(van<-0.0001){var imp=-(1+P.bounce)*van/(1/b1.mass+1/b2.mass);b1.velocity.addScaledVector(cd,-imp/b1.mass);b2.velocity.addScaledVector(cd,imp/b2.mass);}
+            }
+          }
+        }
+      }
+    }
+
+    var xB=vw/2-0.2, floorY=-vh/2+0.05, topY=vh/2-0.05, restit=0.30+0.35*dropF, contain=flyF<0.5, zContain=flyF<0.02;
+    for(var j=0;j<n;j++){
+      var bb=balls[j], r=bb.visualScale;
+      if(contain){
+        if(bb.position.x<-xB-r){bb.position.x=-xB-r;bb.velocity.x*=P.rebound;}else if(bb.position.x>xB+r){bb.position.x=xB+r;bb.velocity.x*=P.rebound;}
+        if(bb.position.y-r<floorY){bb.position.y=floorY+r;if(bb.velocity.y<0)bb.velocity.y=-bb.velocity.y*restit;if(dropF>0.3){bb.velocity.x*=0.86;bb.velocity.z*=0.86;}}
+        if(bb.position.y+r>topY){bb.position.y=topY-r;if(bb.velocity.y>0)bb.velocity.y*=P.rebound;}
+      }
+      if(zContain){if(bb.position.z<-2){bb.position.z=-2;bb.velocity.z*=P.rebound;}else if(bb.position.z>2){bb.position.z=2;bb.velocity.z*=P.rebound;}}
+      dp.copy(bb.position).sub(bb.meshGroup.position);
+      if(dp.lengthSq()>0.000001){ax.set(dp.y,-dp.x,0).normalize();bb.meshGroup.rotateOnWorldAxis(ax,(dp.length()/bb.radius)*0.95);}
+      bb.meshGroup.position.copy(bb.position);
+    }
+    renderer.render(scene,camera);
+    emptyDrawn=progress>3.9;
+    if(!reported){reported=true;onReady();}
+  }
+  frame();
+
+  function onResize(){
+    var w=container.clientWidth,h=container.clientHeight; if(!w||!h)return;
+    camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);frustum();assignTargets();emptyDrawn=false;
+  }
+  if("ResizeObserver" in window)new ResizeObserver(onResize).observe(container); else window.addEventListener("resize",onResize);
+}
+initScene(function(){ready=true;});
+
+/* ================= GAME ================= */
+var GOAL=3000,START=500,ODD=120,KEY="kita-hustle-v2",PESO="₱",MINUS="−";
+var H={
+  snack:{name:"Snack stand",unit:"piece",cost:8,fair:15,base:14,step:1,cap:30,unlock:200,blurb:"Turon, banana cue or cupcakes sold to neighbors and classmates.",
+    real:["Cook one small batch at home with a parent around. Write down what the ingredients cost.","Divide that cost by the number of pieces. That is your cost each.","Sell to family and neighbors you know, at a price above your cost. Count what is left over."]},
+  stickers:{name:"Sticker shop",unit:"sheet",cost:6,fair:20,base:9,step:1,cap:24,unlock:200,blurb:"Draw or design sticker sheets, print them, and sell to friends.",
+    real:["Design five sheets. Note the cost of paper, ink and printing.","Ask classmates what they would pay before you set a price.","Sell the batch, then compare the money you got against the money you spent."]},
+  pets:{name:"Pet walks",unit:"walk",cost:5,fair:40,base:5,step:5,cap:10,unlock:200,blurb:"Walk dogs for neighbors. Each walk slot is a block of your time.",
+    real:["With a parent's okay, offer to walk one dog owned by someone you already know.","Ask what a 30 minute walk is worth in your area, then set your price.","Keep a log: date, minutes and money earned."]},
+  tutor:{name:"Tutoring",unit:"session",cost:3,fair:80,base:4,step:5,cap:10,unlock:400,blurb:"Help younger kids with math or English. Almost no materials needed.",
+    real:["Pick one subject you are strong in and one younger student you know.","Plan a 45 minute session and print or draw practice sheets.","Ask for feedback afterward. Repeat weekly if it went well."]},
+  thrift:{name:"Thrift flips",unit:"item",cost:70,fair:140,base:6,step:5,cap:14,unlock:1000,blurb:"Buy used clothes or gadgets cheap, clean them up, resell for more.",
+    real:["Spend no more than "+PESO+"100 on one item, or pick something from your own closet.","Clean it and take a clear photo in daylight.","Sell it in person with a parent present, or through a parent's account. Work out profit after costs."]},
+  design:{name:"Design gigs",unit:"project",cost:12,fair:250,base:3,step:10,cap:6,unlock:2200,blurb:"Posters, logos or edited videos for small local businesses.",
+    real:["Make one poster or logo for a family business, free, as practice.","Use it as your sample and ask for a short testimonial.","Quote your next project by hours times a fair hourly rate."]}
+};
+var ORDER=["snack","stickers","pets","tutor","thrift","design"];
+var EV=[
+  {t:"Normal week",d:"Nothing unusual. Customers behave as usual.",m:1,w:3},
+  {t:"School fair on Saturday",d:"Lots of people are out and spending.",m:1.4,x:{tutor:0.9},w:1},
+  {t:"Rainy week",d:"Fewer people are outside.",m:0.7,x:{tutor:1.1,design:1},w:1},
+  {t:"A rival set up shop",d:"Another kid is selling the same thing nearby.",m:0.75,w:1},
+  {t:"Payday week",d:"Parents have extra cash to spend.",m:1.25,w:1},
+  {t:"Exam week",d:"Everyone is studying, nobody is shopping.",m:0.85,x:{tutor:1.6},w:1},
+  {t:"A friend posted about you",d:"Free advertising. More people know you exist.",m:1.35,w:1}
+];
+var app=$("play"),book=$("book"),armed=false;
+function fresh(){return {phase:"start",week:1,cash:START,jar:0,owned:[],active:null,set:{},event:null,last:null,earned:0,profitBy:{},tried:{}};}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.phase){var f=fresh();for(var k in o)f[k]=o[k];return f;}}}catch(e){}return fresh();}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+var S=load();
+function money(n){n=Math.round(n);return (n<0?MINUS:"")+PESO+Math.abs(n).toLocaleString("en-US");}
+function rs(v,s){return Math.round(v/s)*s;}
+function rollEvent(){var pool=[];EV.forEach(function(e){for(var i=0;i<e.w;i++)pool.push(e);});return pool[Math.floor(Math.random()*pool.length)];}
+function mult(ev,id){return (ev.x&&ev.x[id]!=null)?ev.x[id]:ev.m;}
+function maxStock(h){return Math.max(0,Math.min(h.cap,Math.floor(S.cash/h.cost)));}
+function ctl(id){var h=H[id];if(!S.set[id])S.set[id]={price:h.fair,stock:Math.min(h.base,h.cap)};return S.set[id];}
+
+function hud(){
+  var pct=Math.min(1,S.jar/GOAL),fh=58*pct,fy=14+58-fh;
+  return '<section class="glass hud" aria-label="Your numbers"><svg class="jar" viewBox="0 0 60 76" role="img" aria-label="Savings jar, '+Math.round(pct*100)+' percent full">'+
+    '<defs><clipPath id="jc"><rect x="8" y="14" width="44" height="58" rx="11"/></clipPath></defs>'+
+    '<rect class="jar-fill" x="8" y="'+fy+'" width="44" height="'+fh+'" clip-path="url(#jc)"/>'+
+    '<rect class="jar-body" x="8" y="14" width="44" height="58" rx="11"/><rect class="jar-lid" x="15" y="4" width="30" height="10" rx="3"/></svg>'+
+    '<dl class="stats"><div><dt>Week</dt><dd>'+S.week+'</dd></div><div><dt>Cash</dt><dd>'+money(S.cash)+'</dd></div>'+
+    '<div><dt>Jar</dt><dd>'+money(S.jar)+' <small>of '+money(GOAL)+'</small></dd></div></dl></section>';
+}
+function startView(){
+  var cards=["snack","stickers","pets"].map(function(id){var h=H[id];
+    return '<article class="glass"><h3>'+h.name+'</h3><p class="blurb">'+h.blurb+'</p><div class="meta"><span>Costs you '+money(h.cost)+' per '+h.unit+'</span><span>Sells for about '+money(h.fair)+'</span></div>'+
+    '<button type="button" class="btn primary" data-act="start" data-id="'+id+'">Start with this</button></article>';}).join("");
+  return '<section class="hero2"><p class="eb">Pick your first hustle</p><h1>Start with '+money(START)+'. Fill the jar to '+money(GOAL)+'.</h1>'+
+    '<p class="lede">Set your price, decide how much to make, and open for the week. Customers, weather and rivals change every week.</p></section>'+
+    '<div class="grid3">'+cards+'</div><p class="fine">Under 18? Ask a parent or guardian before you sell anything for real.</p>';
+}
+function planView(){
+  var id=S.active,h=H[id],c=ctl(id),mx=maxStock(h); c.stock=Math.min(c.stock,mx);
+  var ev=S.event,m=mult(ev,id),tone=m>1.05?"up":(m<0.95?"down":"flat"),word=tone==="up"?"Busier":(tone==="down"?"Slower":"Normal");
+  var lo=Math.round(h.fair*0.8),hi=Math.round(h.fair*1.2),pmin=Math.max(h.step,rs(h.fair*0.4,h.step)),pmax=rs(h.fair*2.2,h.step);
+  var chips=S.owned.map(function(o){return '<button type="button" class="chip" data-act="pick" data-id="'+o+'" aria-pressed="'+(o===id)+'">'+H[o].name+'</button>';}).join("");
+  var broke=S.owned.every(function(o){return Math.floor(S.cash/H[o].cost)<2;});
+  var odd=broke?('<section class="glass"><h3>You are almost out of cash</h3><p class="blurb">You cannot afford enough stock to run your hustle. Take an odd job this week, like helping a neighbor or selling something you no longer use. It pays '+money(ODD)+' and costs nothing, but it does not grow your business.</p><button type="button" class="btn sun" data-act="odd">Do an odd job</button></section>'):"";
+  var shop=ORDER.filter(function(o){return S.owned.indexOf(o)<0;}).map(function(o){
+    var s=H[o],gap=s.unlock-S.cash,ok=gap<=0;
+    return '<article class="glass"><h3>'+s.name+'</h3><p class="blurb">'+s.blurb+'</p><div class="meta"><span>Costs you '+money(s.cost)+' per '+s.unit+'</span><span>Sells for about '+money(s.fair)+'</span></div>'+
+      '<button type="button" class="btn small'+(ok?' sun':'')+'" data-act="buy" data-id="'+o+'"'+(ok?'':' disabled')+'>'+(ok?('Open it for '+money(s.unlock)):('Need '+money(gap)+' more'))+'</button></article>';}).join("");
+  return hud()+
+    '<section class="glass forecast" aria-label="This week\'s forecast"><span class="pill '+tone+'">'+word+'</span><div><b>'+ev.t+'</b><span class="t">'+ev.d+'</span></div></section>'+
+    '<div class="chips" role="group" aria-label="Your hustles">'+chips+'</div>'+
+    '<section class="glass" aria-label="Plan your week"><h3>'+h.name+'</h3>'+
+    '<div class="meta"><span>Each '+h.unit+' costs you '+money(h.cost)+' to make</span><span>Nearby sellers charge about '+money(lo)+' to '+money(hi)+'</span></div>'+
+    '<div class="field"><div class="row"><label for="price">Your price</label><output id="pvPrice" for="price"></output></div><input type="range" id="price" min="'+pmin+'" max="'+pmax+'" step="'+h.step+'" value="'+c.price+'"><div class="scale"><span>'+money(pmin)+'</span><span>'+money(pmax)+'</span></div></div>'+
+    '<div class="field"><div class="row"><label for="stock">How many to make</label><output id="pvStock" for="stock"></output></div><input type="range" id="stock" min="0" max="'+Math.max(mx,1)+'" step="1" value="'+c.stock+'"'+(mx<1?' disabled':'')+'><div class="scale"><span>0</span><span>'+mx+' (all you can afford)</span></div></div>'+
+    '<dl class="preview"><dt>You spend now</dt><dd id="pvCost"></dd><dt>Break-even</dt><dd id="pvBe"></dd><dt>Best case profit</dt><dd id="pvBest"></dd></dl>'+
+    '<button type="button" class="btn primary" id="openBtn" data-act="open">Open for the week</button></section>'+odd+
+    (shop?('<h3 style="font:700 1.5rem var(--f-display);letter-spacing:-.02em;margin-top:8px">Grow your business</h3><p class="fine">Opening a new hustle costs money now and pays back later. You can run any hustle you own, one per week.</p><div class="grid3">'+shop+'</div>'):"");
+}
+function paintPreview(){
+  var id=S.active;if(!id||S.phase!=="plan")return;
+  var h=H[id],c=ctl(id),stock=Math.min(c.stock,maxStock(h)),total=stock*h.cost,be=stock>0?Math.ceil(total/c.price):0,best=stock*c.price-total;
+  if(!$("pvPrice"))return;
+  $("pvPrice").textContent=money(c.price)+" each";
+  $("pvStock").textContent=stock+" "+h.unit+(stock===1?"":"s");
+  $("pvCost").textContent=money(total);
+  $("pvBe").textContent=stock<1?"Make something first":(be>stock?"Impossible at this price":"Sell "+be+" of "+stock);
+  $("pvBest").textContent=stock<1?"-":money(best);
+  $("openBtn").disabled=stock<1;
+}
+function row(k,v,cls){return '<div class="r'+(cls?' '+cls:'')+'"><span>'+k+'</span><span>'+v+'</span></div>';}
+function resultView(){
+  var L=S.last;
+  if(L.kind==="odd")return hud()+'<p class="eb">Week '+S.week+' results</p><h2 class="big pos">+'+money(L.profit)+'</h2><p class="tip">You took an odd job instead of running a hustle. It is safe money, but there is no way to scale it. A hustle with good pricing earns more every week.</p><button type="button" class="btn primary" data-act="next">Start next week</button>';
+  var h=H[L.id],pos=L.profit>=0,cls=pos?"pos":"neg",margin=L.revenue>0?Math.round(L.profit/L.revenue*100):0;
+  var receipt='<article class="receipt" aria-label="Weekly receipt"><h3>Kita</h3><p class="sub">Week '+S.week+' &middot; '+h.name+'</p><hr>'+
+    row("Made",L.stock+" "+h.unit+(L.stock===1?"":"s"))+row("Your price",money(L.price)+" each")+row("Wanted one",L.demand)+row("Sold",L.sold)+row("Unsold",L.unsold)+'<hr>'+
+    row("Money in",money(L.revenue))+row("Cost to make",money(-L.cost))+'<hr>'+row("PROFIT",(pos?"+":"")+money(L.profit),"total "+cls)+row("Profit margin",margin+"%")+'</article>';
+  var jar="";
+  if(L.profit>0&&!L.jarDone){
+    jar='<section class="glass"><h3>Put some in the jar?</h3><p class="blurb">Jar money is locked until you reach '+money(GOAL)+'. Cash stays free to buy stock or open new hustles. Both matter.</p><div class="jarbtns">'+
+      [0,0.25,0.5,1].map(function(p){var amt=p===0?0:Math.min(S.cash,Math.max(1,Math.round(L.profit*p)));return '<button type="button" class="btn small" data-act="jar" data-pct="'+p+'">'+(p===0?'Keep it all':('Jar '+money(amt)))+'</button>';}).join("")+'</div></section>';
+  }else if(L.jarDone&&L.jarAmt>0)jar='<p class="fine">You put '+money(L.jarAmt)+' in the jar.</p>';
+  var next=(L.profit<=0||L.jarDone)?'<button type="button" class="btn primary" data-act="next">Start next week</button>':"";
+  return hud()+'<p class="eb">Week '+S.week+' results</p><h2 class="big '+cls+'">'+(pos?"+":"")+money(L.profit)+'</h2><p class="tip">'+L.tip+'</p>'+receipt+jar+next;
+}
+function winView(){
+  var best=null,bv=-Infinity;for(var k in S.profitBy){if(S.profitBy[k]>bv){bv=S.profitBy[k];best=k;}}
+  return hud()+'<section class="hero2"><p class="eb">Jar full</p><h1>You hit '+money(GOAL)+' in '+S.week+' weeks.</h1><p class="lede">'+(best?('Your best earner was '+H[best].name+', with '+money(bv)+' in total profit. '):"")+'You saw how price, cost and demand push against each other. Now try it with real stuff.</p></section>'+
+    '<div class="grid3"><button type="button" class="btn sun" data-act="tab" data-tab="book">Open the Playbook</button><button type="button" class="btn" data-act="reset2">Play again</button></div>';
+}
+function bookView(){
+  var cards=ORDER.map(function(id){var h=H[id];
+    return '<article class="glass"><h3>'+h.name+'</h3><p class="blurb">'+h.blurb+'</p><ol class="steps">'+h.real.map(function(s){return '<li>'+s+'</li>';}).join("")+'</ol>'+
+      '<label class="check"><input type="checkbox" data-tried="'+id+'"'+(S.tried[id]?' checked':'')+'> I tried this for real</label></article>';}).join("");
+  return '<section class="hero2"><p class="eb">From game to real life</p><h1>Playbook</h1><p class="lede">Pick one hustle and try it small. The game numbers are made up, so your real prices come from your own costs and what your neighbors will pay.</p></section>'+
+    '<section class="glass"><h3>Money words</h3><dl class="words"><dt>Revenue</dt><dd>All the money customers pay you.</dd><dt>Cost</dt><dd>What you spent to make or do the thing.</dd><dt>Profit</dt><dd>Revenue minus cost. This is what you keep.</dd><dt>Margin</dt><dd>Profit as a share of revenue. 30% means you keep 30 centavos of each peso.</dd><dt>Break-even</dt><dd>The number you must sell before you stop losing money.</dd></dl></section>'+
+    '<section class="glass"><h3>Four rules for any hustle</h3><ol class="rules"><li>Know your cost for one item before you pick a price.</li><li>Start above cost, then test. Raise it if you sell out, lower it if things sit.</li><li>Write down every sale and every expense. A notebook is enough.</li><li>Move part of every profit into savings before you spend it.</li></ol></section>'+
+    cards+
+    '<section class="glass safe"><h3>Stay safe</h3><ol class="rules"><li>Ask a parent or guardian before you sell anything.</li><li>Sell to people you know, or with an adult present.</li><li>Meet buyers in public places, never alone at your home.</li><li>Never send money first to a stranger, and never share your address or ID online.</li><li>Payment apps and marketplaces usually need an adult account. Use a parent\'s.</li></ol></section>';
+}
+function tipFor(h,price,stock,demand,sold,profit){
+  var un=stock-sold;
+  if(profit<0&&price<=h.cost*1.05)return "Your price was at or below what it costs you to make one, so every sale lost money. Price has to cover cost first.";
+  if(price>h.fair*1.4&&sold<=stock*0.5)return "At that price many people walked away. Sellers nearby charge about "+money(h.fair)+", so customers compared and went elsewhere.";
+  if(profit<0)return "You paid more to make these than they brought in. "+un+" went unsold. Try making fewer, or lower the price a little.";
+  if(sold===stock&&demand>=stock*1.3)return "You sold out and "+(demand-stock)+" more people wanted one. That is money left on the table. Make more next week, or raise the price.";
+  if(sold===stock)return "Sold out. That usually means you can charge a bit more.";
+  if(un>=stock*0.4)return un+" went unsold, and the money you spent on them is gone. Try a lower price or a smaller batch.";
+  if((price-h.cost)/price<0.25)return "Most of it sold, but each sale kept only a thin slice. A slightly higher price could pay better.";
+  return "Solid week. Most of it sold and you kept a healthy share.";
+}
+function openWeek(){
+  var id=S.active,h=H[id],c=ctl(id),stock=Math.min(c.stock,maxStock(h));if(stock<1)return;
+  var price=c.price,m=mult(S.event,id),pf=Math.min(2.5,Math.pow(h.fair/price,1.8));
+  var demand=Math.max(0,Math.round(h.base*pf*m*(0.85+Math.random()*0.3))),sold=Math.min(stock,demand),unsold=stock-sold;
+  var revenue=sold*price,cost=stock*h.cost,profit=revenue-cost;
+  S.cash+=profit;S.earned+=profit;S.profitBy[id]=(S.profitBy[id]||0)+profit;
+  S.last={kind:"sale",id:id,price:price,stock:stock,demand:demand,sold:sold,unsold:unsold,revenue:revenue,cost:cost,profit:profit,tip:tipFor(h,price,stock,demand,sold,profit),jarDone:profit<=0,jarAmt:0};
+  S.phase="result";save();render(true);
+}
+function oddJob(){S.cash+=ODD;S.earned+=ODD;S.last={kind:"odd",profit:ODD,jarDone:true,jarAmt:0};S.phase="result";save();render(true);}
+function putJar(p){var L=S.last,amt=p===0?0:Math.min(S.cash,Math.max(1,Math.round(L.profit*p)));S.cash-=amt;S.jar+=amt;L.jarDone=true;L.jarAmt=amt;if(S.jar>=GOAL)S.phase="win";save();render(S.phase==="win");}
+function nextWeek(){S.week++;S.event=rollEvent();S.phase="plan";save();render(true);}
+function startWith(id){S=fresh();S.owned=[id];S.active=id;S.phase="plan";S.event=rollEvent();save();render(true);}
+function buy(id){var h=H[id];if(S.cash<h.unlock||S.owned.indexOf(id)>=0)return;S.cash-=h.unlock;S.owned.push(id);S.active=id;save();render(true);}
+function render(toGame){
+  var v=S.phase==="start"?startView():S.phase==="plan"?planView():S.phase==="result"?resultView():winView();
+  app.innerHTML=v;book.innerHTML=bookView();
+  $("resetSlot").innerHTML=S.phase==="start"?"":'<button type="button" class="linkish" data-act="reset">'+(armed?"Tap again to erase your progress":"Start over")+'</button>';
+  paintPreview();
+  if(toGame)goTo($("game").offsetTop);
+}
+function setTab(t){
+  app.hidden=(t!=="play");book.hidden=(t!=="book");
+  var bs=document.querySelectorAll(".tabs button");
+  for(var i=0;i<bs.length;i++)bs[i].setAttribute("aria-pressed",String(bs[i].getAttribute("data-tab")===t));
+}
+document.addEventListener("click",function(e){
+  var t=e.target.closest?e.target.closest("[data-act]"):null;if(!t||t.disabled)return;
+  var a=t.getAttribute("data-act"),id=t.getAttribute("data-id");
+  if(a==="tab"){setTab(t.getAttribute("data-tab"));goTo($("game").offsetTop);}
+  else if(a==="start")startWith(id);
+  else if(a==="pick"){S.active=id;save();render(false);}
+  else if(a==="open")openWeek();
+  else if(a==="odd")oddJob();
+  else if(a==="buy")buy(id);
+  else if(a==="jar")putJar(parseFloat(t.getAttribute("data-pct")));
+  else if(a==="next")nextWeek();
+  else if(a==="reset"){
+    if(!armed){armed=true;render(false);setTimeout(function(){armed=false;render(false);},3500);}
+    else{armed=false;S=fresh();save();render(false);setTab("play");}
+  }else if(a==="reset2"){S=fresh();save();render(false);setTab("play");}
+});
+document.addEventListener("input",function(e){
+  var t=e.target;
+  if(t.id==="price"||t.id==="stock"){var c=ctl(S.active);if(t.id==="price")c.price=parseInt(t.value,10);else c.stock=parseInt(t.value,10);save();paintPreview();}
+});
+document.addEventListener("change",function(e){var id=e.target.getAttribute&&e.target.getAttribute("data-tried");if(id){S.tried[id]=e.target.checked;save();}});
+if(S.phase!=="start"&&(!S.event||!S.active)){S.event=S.event||rollEvent();if(!S.active)S.active=S.owned[0]||null;if(!S.active)S=fresh();}
+render(false);
+})();
+</script>
+
+</body></html>
